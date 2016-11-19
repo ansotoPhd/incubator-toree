@@ -37,7 +37,7 @@ from pyspark.serializers import MarshalSerializer, PickleSerializer
 from time import sleep
 
 # for back compatibility
-from pyspark.sql import SparkSession, DataFrame, Row
+from pyspark.sql import DataFrame, Row
 
 client = GatewayClient(port=int(sys.argv[1]))
 sparkVersion = sys.argv[2]

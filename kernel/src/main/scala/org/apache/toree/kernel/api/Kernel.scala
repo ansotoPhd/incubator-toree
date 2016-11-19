@@ -17,12 +17,13 @@
 
 package org.apache.toree.kernel.api
 
-import java.io.{InputStream, PrintStream}
+import java.io.{File, InputStream, PrintStream}
+import java.lang.reflect.Method
 import java.util.concurrent.ConcurrentHashMap
 
 import com.typesafe.config.Config
 import org.apache.spark.api.java.JavaSparkContext
-import org.apache.spark.sql.{SQLContext, SparkSession}
+import org.apache.spark.sql.{SQLContext}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.toree.annotations.Experimental
 import org.apache.toree.boot.layer.InterpreterManager
@@ -31,6 +32,7 @@ import org.apache.toree.global
 import org.apache.toree.global.ExecuteRequestState
 import org.apache.toree.interpreter.Results.Result
 import org.apache.toree.interpreter._
+import org.apache.toree.kernel.interpreter.scala.ScalaInterpreter
 import org.apache.toree.kernel.protocol.v5
 import org.apache.toree.kernel.protocol.v5.kernel.ActorLoader
 import org.apache.toree.kernel.protocol.v5.magic.MagicParser
@@ -42,6 +44,7 @@ import org.apache.toree.utils.{KeyValuePairUtils, LogLike}
 
 import scala.language.dynamics
 import scala.reflect.runtime.universe._
+import scala.tools.nsc.Settings
 import scala.util.{DynamicVariable, Try}
 
 /**
@@ -88,10 +91,16 @@ class Kernel (
   private val currentErrorKernelMessage =
     new DynamicVariable[KernelMessage](null)
 
-  private var _sparkSession: SparkSession = null
-  def _sparkContext:SparkContext = _sparkSession.sparkContext
-  def _javaSparkContext: JavaSparkContext = new JavaSparkContext(_sparkContext)
-  //def _sqlContext = _sparkSession;
+  // private var _sparkSession: SparkSession = null
+  // def _sparkContext:SparkContext = _sparkSession.sparkContext
+  // def _javaSparkContext: JavaSparkContext = new JavaSparkContext(_sparkContext)
+
+  private var _sparkContext:SparkContext = null;
+  private var _sparkConf:SparkConf = null;
+  private var _javaSparkContext:JavaSparkContext = null;
+  private var _sqlContext:SQLContext = null;
+  private var _sparkClassServer:Any = null;
+
 
   /**
    * Represents magics available through the kernel.
@@ -345,15 +354,21 @@ class Kernel (
   }
 
   override def createSparkContext(conf: SparkConf): SparkContext = {
-    val sconf = createSparkConf(conf)
-    _sparkSession = SparkSession.builder.config(sconf).getOrCreate()
+    val sconf: SparkConf = createSparkConf(conf)
+    _sparkConf = sconf
+
+    //_sparkSession = SparkSession.builder.config(sconf).getOrCreate()
 
     val sparkMaster = sconf.getOption("spark.master").getOrElse("not_set")
     logger.info( s"Connecting to spark.master $sparkMaster")
 
+    _sparkContext = initializeSparkContext(sparkConf)
+    _javaSparkContext = new JavaSparkContext(_sparkContext)
+    _sqlContext = initializeSqlContext(_sparkContext)
+
     // TODO: Convert to events
     pluginManager.dependencyManager.add(sconf)
-    pluginManager.dependencyManager.add(_sparkSession)
+    //pluginManager.dependencyManager.add(_sparkSession)
     pluginManager.dependencyManager.add(_sparkContext)
     pluginManager.dependencyManager.add(_javaSparkContext)
 
@@ -373,7 +388,92 @@ class Kernel (
 
     logger.info("Setting deployMode to client")
     conf.set("spark.submit.deployMode", "client")
+
+    // Create and start a Spark HttpServer
+    // -----------------------------------------------------------------------------------------------
+    // Using reflection hack to access to a private class
+
+    // Spark conf used in HttpServer initialization
+    val sConf: SparkConf = new SparkConf()
+
+    // Output directory
+    val outputDir = ScalaInterpreter.ensureTemporaryFolder()
+    logger.info( "Creating temporal directory for storing scala classes: " + outputDir )
+
+    // Creating security manager
+    logger.info( "Creating security manager" )
+    val securityManagerClass: Class[_] = java.lang.Class.forName("org.apache.spark.SecurityManager")
+    val securityManagerConstructor = securityManagerClass.getDeclaredConstructor(classOf[SparkConf])
+    val securityManager = securityManagerConstructor.newInstance( sConf )
+
+    logger.info( "Creating HTTP Server" )
+    val httpServerClass: Class[_] = java.lang.Class.forName("org.apache.spark.HttpServer")
+    val httpServerConstructor =
+      httpServerClass.getDeclaredConstructor(
+        classOf[SparkConf], classOf[File], securityManagerClass,classOf[Int] ,classOf[String]
+      )
+    val httpServer: Any =
+      httpServerConstructor.newInstance(
+        sConf, outputDir, securityManager.asInstanceOf[Object], 0: java.lang.Integer,  "HTTP server"
+      )
+    _sparkClassServer = httpServer
+
+    logger.info( "Starting HTTP Server" )
+    val startServerMethod: Method = httpServerClass.getMethod("start")
+    startServerMethod.invoke(httpServer)
+
+    logger.info( "Getting URI of HTTP Server" )
+    val uriServerMethod: Method = httpServerClass.getMethod("uri")
+    val uri: String = uriServerMethod.invoke(httpServer).asInstanceOf[String]
+
+    logger.info( "REPL Class Server Uri: " + uri )
+    conf.set("spark.repl.class.uri", uri )
+
+    /*
+      logger.info( "Creating Scala Interpreter settings: linked with classServer thought the created directory" )
+      val s = new Settings()
+      s.processArguments(
+        List(
+          "-Yrepl-class-based",
+          "-Yrepl-outdir", s"${outputDir.getAbsolutePath}"),
+        true
+      )
+      _scalaInterpreterSettings = s
+
+      logger.info( "Initializating interpreter" )
+      interpreterManager.initializeInterpreters(this)
+    */
+
     conf
+  }
+
+  protected[kernel] def initializeSqlContext(
+                                              sparkContext: SparkContext
+                                            ): SQLContext = {
+    val sqlContext: SQLContext = try {
+      logger.info("Attempting to create Hive Context")
+      val hiveContextClassString =
+        "org.apache.spark.sql.hive.HiveContext"
+
+      logger.debug(s"Looking up $hiveContextClassString")
+      val hiveContextClass = Class.forName(hiveContextClassString)
+
+      val sparkContextClass = classOf[SparkContext]
+      val sparkContextClassName = sparkContextClass.getName
+
+      logger.debug(s"Searching for constructor taking $sparkContextClassName")
+      val hiveContextContructor =
+        hiveContextClass.getConstructor(sparkContextClass)
+
+      logger.debug("Invoking Hive Context constructor")
+      hiveContextContructor.newInstance(sparkContext).asInstanceOf[SQLContext]
+    } catch {
+      case _: Throwable =>
+        logger.warn("Unable to create Hive Context! Defaulting to SQL Context!")
+        new SQLContext(sparkContext)
+    }
+
+    sqlContext
   }
 
   // TODO: Think of a better way to test without exposing this
@@ -402,7 +502,20 @@ class Kernel (
   }
 
   override def sparkContext: SparkContext = _sparkContext
-  override def sparkConf: SparkConf = _sparkSession.sparkContext.getConf
+  override def sqlContext: SQLContext = _sqlContext
+  override def sparkConf: SparkConf = _sparkConf
+  override def sparkClassServer: Any = _sparkClassServer
+  //override def sparkConf: SparkConf = _sparkSession.sparkContext.getConf
   override def javaSparkContext: JavaSparkContext = _javaSparkContext
-  override def sparkSession: SparkSession = _sparkSession
+  //override def sparkSession: SparkSession = _sparkSession
+
+  /*
+  override def sparkContext: SparkContext = _sparkContext
+  override def sparkConf: SparkConf = _sparkConf
+  override def javaSparkContext: JavaSparkContext = _javaSparkContext
+  override def sqlContext: SQLContext = _sqlContext
+  override def scalaInterpreterSettings: Settings = _scalaInterpreterSettings
+  override def sparkClassServer: Any = _sparkClassServer
+   */
+
 }

@@ -19,6 +19,7 @@ package org.apache.toree.magic.builtin
 
 import java.io.{PrintStream, StringWriter}
 
+import org.apache.spark.sql.Row
 import org.apache.toree.interpreter.{ExecuteAborted, ExecuteError, ExecuteFailure, Results}
 import org.apache.toree.kernel.protocol.v5._
 import org.apache.toree.magic._
@@ -94,7 +95,7 @@ class DataFrame extends CellMagic with IncludeKernelInterpreter
         val rddVarName = kernelInterpreter.lastExecutionVariableName.get
         kernelInterpreter.read(rddVarName).map(variableVal => {
           _dataFrameConverter.convert(
-            variableVal.asInstanceOf[org.apache.spark.sql.DataFrame],
+            variableVal.asInstanceOf[org.apache.spark.sql.Dataset[Row]],
             outputType,
             limit
           ).map(output =>

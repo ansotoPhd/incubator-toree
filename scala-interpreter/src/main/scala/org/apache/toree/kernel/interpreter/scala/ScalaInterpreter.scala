@@ -24,9 +24,8 @@ import java.util.concurrent.ExecutionException
 
 import com.typesafe.config.{Config, ConfigFactory}
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.repl.Main
-
+import org.apache.spark.sql.SQLContext
 import org.apache.toree.interpreter._
 import org.apache.toree.kernel.api.{KernelLike, KernelOptions}
 import org.apache.toree.utils.{MultiOutputStream, TaskManager}
@@ -86,7 +85,7 @@ class ScalaInterpreter(private val config:Config = ConfigFactory.load) extends I
 
      start()
      bindKernelVariable(kernel)
-     bindSparkSession()
+     //bindSparkSession()
      bindSparkContext()
 
      this
@@ -278,17 +277,21 @@ class ScalaInterpreter(private val config:Config = ConfigFactory.load) extends I
        //       inside the interpreter)
        logger.debug("Initializing Spark cluster in interpreter")
 
-//       doQuietly {
-//         interpret(Seq(
-//           "val $toBeNulled = {",
-//           "  var $toBeNulled = sc.emptyRDD.collect()",
-//           "  $toBeNulled = null",
-//           "}"
-//         ).mkString("\n").trim())
-//       }
      }
    }
 
+  def bindSqlContext(sqlContext: SQLContext): Unit = {
+    val bindName = "sqlContext"
+
+    doQuietly {
+      // TODO: This only adds the context to the main interpreter AND
+      //       is limited to the Scala interpreter interface
+      logger.debug(s"Binding SQLContext into interpreter as $bindName")
+      interpret(s"""def ${bindName}: ${classOf[SQLContext].getName} = kernel.sqlContext""")
+    }
+  }
+
+  /*
   def bindSparkSession(): Unit = {
     val bindName = "spark"
 
@@ -299,21 +302,9 @@ class ScalaInterpreter(private val config:Config = ConfigFactory.load) extends I
 
       interpret(s"""def ${bindName}: ${classOf[SparkSession].getName} = kernel.sparkSession""")
 
-//      interpret(
-//        s"""
-//           |def $bindName: ${classOf[SparkSession].getName} = {
-//           |   if (org.apache.toree.kernel.interpreter.scala.InterpreterHelper.sparkSession != null) {
-//           |     org.apache.toree.kernel.interpreter.scala.InterpreterHelper.sparkSession
-//           |   } else {
-//           |     val s = org.apache.spark.repl.Main.createSparkSession()
-//           |     org.apache.toree.kernel.interpreter.scala.InterpreterHelper.sparkSession = s
-//           |     s
-//           |   }
-//           |}
-//         """.stripMargin)
-
      }
    }
+   */
 
    override def classLoader: ClassLoader = _runtimeClassloader
 

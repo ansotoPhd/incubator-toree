@@ -22,7 +22,7 @@ import java.io.{InputStream, OutputStream, PrintStream}
 import com.typesafe.config.Config
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.sql.{SQLContext, SparkSession}
+import org.apache.spark.sql.SQLContext
 
 /**
  * Interface for the kernel API. This does not include exposed variables.
@@ -107,9 +107,13 @@ trait KernelLike {
 
   def sparkContext: SparkContext
 
+  def sqlContext: SQLContext
+
   def sparkConf: SparkConf
 
   def javaSparkContext: JavaSparkContext
 
-  def sparkSession: SparkSession
+  def sparkClassServer: Any
+
+
 }

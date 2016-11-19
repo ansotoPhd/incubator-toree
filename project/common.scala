@@ -33,7 +33,6 @@ object Common {
   private val buildOrganization         = "org.apache.toree.kernel"
   private val buildVersion              = if (snapshot) s"$versionNumber-SNAPSHOT" else versionNumber
   private val buildScalaVersion         = "2.11.8"
-//  private val buildScalaVersion         = "2.10.6"
 
   val buildInfoSettings = Seq(
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion, "sparkVersion" -> sparkVersion),
@@ -92,7 +91,7 @@ object Common {
 
   private lazy val sparkVersion = {
     val sparkEnvironmentVariable = "APACHE_SPARK_VERSION"
-    val defaultSparkVersion = "2.0.0"
+    val defaultSparkVersion = "1.6.2"
 
     val _sparkVersion = Properties.envOrNone(sparkEnvironmentVariable)
 
@@ -134,8 +133,7 @@ object Common {
     gpgCommand := gpgLocation,
     pgpPassphrase in Global := Some(gpgPassword.toArray),
     version := buildVersion,
-    scalaVersion := buildScalaVersion,
-//    crossScalaVersions := Seq("2.10.5", "2.11.8"),
+    scalaVersion := "2.11.8",
     crossScalaVersions := Seq("2.11.8"),
     isSnapshot := snapshot,
     updateOptions := updateOptions.value.withCachedResolution(true),
@@ -145,7 +143,13 @@ object Common {
     ),
     // Test dependencies
     libraryDependencies ++= Seq(
-      "org.scalatest" %% "scalatest" % "2.2.6" % "test", // Apache v2
+      "org.scala-lang" % "scala-reflect" % "2.11.8",
+      "org.scala-lang" % "scala-compiler" % "2.11.8",
+      "org.scala-lang.modules" % "scala-xml_2.11" % "1.0.4",
+
+      "org.scalatest" %% "scalatest" % "2.2.6" % "test" // Apache v2
+        exclude("org.scala-lang", "scala-reflect")
+        exclude("org.scala-lang.modules", "scala-xml_2.11"),
       "org.mockito" % "mockito-all" % "1.10.19" % "test",   // MIT
       // use the same jackson version in test than the one provided at runtime by Spark 2.0.0
       "com.fasterxml.jackson.core" % "jackson-databind" % "2.6.5" % "test" // Apache v2
@@ -174,18 +178,6 @@ object Common {
 
     mappings in packageBin in Compile += file("LICENSE") -> "LICENSE",
     mappings in packageBin in Compile += file("NOTICE") -> "NOTICE",
-
-//    coursierVerbosity := {
-//      val level = Try(Integer.valueOf(Properties.envOrElse(
-//        "TOREE_RESOLUTION_VERBOSITY", "1")
-//      ).toInt).getOrElse(1)
-//
-//      scala.Console.out.println(
-//        s"[INFO] Toree Resolution Verbosity Level = $level"
-//      )
-//
-//      level
-//    },
 
     scalacOptions in (Compile, doc) ++= Seq(
       // Ignore packages (for Scaladoc) not from our project

@@ -30,6 +30,7 @@ import scala.tools.nsc.interpreter.{InputStream => _, OutputStream => _, _}
 import scala.concurrent.Future
 import scala.tools.nsc.{Global, Settings, util}
 import scala.util.Try
+import scala.tools.nsc.interpreter
 
 trait ScalaInterpreterSpecific extends SettingsProducerLike { this: ScalaInterpreter =>
   private val ExecutionExceptionName = "lastException"

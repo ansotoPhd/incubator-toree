@@ -17,11 +17,12 @@
 
 package org.apache.toree.magic.dependencies
 
-import org.apache.spark.sql.{SQLContext, SparkSession}
+import org.apache.spark.sql.{SQLContext}
 import org.apache.toree.magic.Magic
 import org.apache.toree.plugins.Plugin
 import org.apache.toree.plugins.annotations.{Event, Init}
 
+/*
 trait IncludeSparkSession extends Plugin {
   this: Magic =>
 
@@ -32,3 +33,4 @@ trait IncludeSparkSession extends Plugin {
   private var _spark: SparkSession = _
   def spark: SparkSession = _spark
 }
+*/
