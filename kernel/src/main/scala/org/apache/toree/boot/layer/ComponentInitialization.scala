@@ -218,9 +218,12 @@ trait StandardComponentInitialization extends ComponentInitialization {
 
     // Load internal plugins under kernel module
     logger.debug("Loading internal plugins")
-    val internalPlugins = pluginManager.initialize()
-    logger.info(internalPlugins.size + " internal plugins loaded")
-
+    try {
+      val internalPlugins = pluginManager.initialize()
+      logger.info(internalPlugins.size + " internal plugins loaded")
+    }catch{
+      case _ : Throwable => ""
+    }
     // Load external plugins if provided
     logger.debug("Loading external plugins")
     val externalPlugins = if (magicUrlArray.nonEmpty) {

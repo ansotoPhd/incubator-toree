@@ -146,7 +146,6 @@ object Common {
       "org.scala-lang" % "scala-reflect" % "2.11.8",
       "org.scala-lang" % "scala-compiler" % "2.11.8",
       "org.scala-lang.modules" % "scala-xml_2.11" % "1.0.4",
-
       "org.scalatest" %% "scalatest" % "2.2.6" % "test" // Apache v2
         exclude("org.scala-lang", "scala-reflect")
         exclude("org.scala-lang.modules", "scala-xml_2.11"),

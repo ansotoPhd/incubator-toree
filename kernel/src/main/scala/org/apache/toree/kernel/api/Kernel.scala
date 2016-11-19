@@ -397,7 +397,7 @@ class Kernel (
     val sConf: SparkConf = new SparkConf()
 
     // Output directory
-    val outputDir = ScalaInterpreter.ensureTemporaryFolder()
+    val outputDir: File = new File(ScalaInterpreter.ensureTemporaryFolder())
     logger.info( "Creating temporal directory for storing scala classes: " + outputDir )
 
     // Creating security manager

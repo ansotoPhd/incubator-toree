@@ -17,7 +17,7 @@
 
 libraryDependencies ++= Seq(
   "org.zeromq"        % "jeromq"        % "0.3.6",
-  "com.typesafe.akka" %% "akka-actor"   % "2.4.8",
-  "com.typesafe.akka" %% "akka-slf4j"   % "2.4.8",
-  "com.typesafe.akka" %% "akka-testkit" % "2.4.8" % "test"
+  "com.typesafe.akka" %% "akka-actor"   % "2.3.11",
+  "com.typesafe.akka" %% "akka-slf4j"   % "2.3.11",
+  "com.typesafe.akka" %% "akka-testkit" % "2.3.11" % "test"
 )
